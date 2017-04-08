@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # BFLIM Tool
-# Version 0.1
+# Version 0.2
 # Copyright © 2017 AboodXD
 
 # This file is part of BFLIM Tool.
@@ -26,7 +26,7 @@ import os, sys, struct, time
 import requests
 import shutil
 from tkinter import Tk, Frame, Button, Canvas, Scrollbar, Menu
-from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import askopenfilename, askdirectory
 import tkinter.messagebox as messagebox
 import urllib.request
 import zipfile
@@ -244,6 +244,173 @@ class imagHeader(struct.Struct):
         self.swizzle,
         self.imageSize) = self.unpack_from(data, pos)
 
+def openfolder():
+    folder = askdirectory(parent=top)
+    num_files = len([file for file in os.listdir(folder)
+                     if (os.path.isfile(os.path.join(folder, file)) and file.endswith(".bflim"))])
+    print(str(num_files))
+
+    for file in os.listdir(folder):
+        if file.endswith(".bflim"):
+            filename = folder + "/" + file
+
+            with open(filename, "rb") as inf:
+                inb = inf.read()
+                inf.close()
+
+            global menubar
+            global filemenu
+            
+            flim = FLIMData()
+
+            pos = struct.unpack(">I", inb[-4:])[0]
+
+            header = FLIMHeader()
+            header.data(inb, pos)
+                
+            if header.magic != b"FLIM":
+                messagebox.showinfo("", "Invalid BFLIM header!")
+            else:
+                if header.endian == 0xFEFF:
+                    bom = '>'
+                elif header.endian == 0xFFFE:
+                    bom = '<'
+
+                pos += header.size
+
+                info = imagHeader(bom)
+                info.data(inb, pos)
+
+                if info.magic != b'imag':
+                    messagebox.showinfo("", "Invalid imag header!")
+                else:
+                    flim.width = info.width
+                    flim.height = info.height
+
+                    if info.format_ == 0x00000000:
+                        flim.format = 0x00000001
+                    elif info.format_ == 0x00000001:
+                        flim.format = 0x00000001
+                    elif info.format_ == 0x00000003:
+                        flim.format = 0x00000007
+                    elif info.format_ == 0x00000005:
+                        flim.format = 0x00000008
+                    elif info.format_ == 0x00000009:
+                        flim.format = 0x0000001a
+                    elif info.format_ == 0x00000014:
+                        flim.format = 0x0000001a
+                    elif info.format_ == 0x0000000C:
+                        flim.format = 0x00000031
+                    elif info.format_ == 0x00000012:
+                        flim.format = 0x00000031
+                    elif info.format_ == 0x00000015:
+                        flim.format = 0x00000031
+                    elif info.format_ == 0x0000000D:
+                        flim.format = 0x00000032
+                    elif info.format_ == 0x00000016:
+                        flim.format = 0x00000032
+                    elif info.format_ == 0x0000000E:
+                        flim.format = 0x00000033
+                    elif info.format_ == 0x00000017:
+                        flim.format = 0x00000033
+                    elif info.format_ == 0x0000000F:
+                        flim.format = 0x00000034
+                    elif info.format_ == 0x00000010:
+                        flim.format = 0x00000034
+                    elif info.format_ == 0x00000011:
+                        flim.format = 0x00000035
+                    elif info.format_ == 0x00000012:
+                        flim.format = 0x00000030
+
+                    flim.imageSize = info.imageSize
+
+                    flim.swizzle = info.swizzle
+                    flim.swizzle = (((flim.swizzle & 0xF0) >> 4) // 2) << 8
+
+                    flim.alignment = info.alignment
+
+                    # Calculate Pitch
+                    # Welp, does this even work?
+                    bpp = surfaceGetBitsPerPixel(flim.format)
+
+                    try:
+                        if (flim.format != 0x31 and flim.format != 0x32 and flim.format != 0x33):
+                            size = flim.width
+                        else:
+                            size = flim.height
+
+                        flim.pitch = size // bpp
+
+                        import math
+                        frac, whole = math.modf(flim.pitch)
+                        whole = int(whole)
+
+                        while (bpp * whole) < size:
+                            whole += 1
+
+                        flim.pitch = (bpp * whole)
+                    except ZeroDivisionError:
+                        flim.pitch = 1
+
+                    flim.data = inb[:info.imageSize]
+
+                    name = os.path.splitext(filename)[0]
+
+                    if os.path.isfile(name + ".dds"):
+                        pass
+                    else:
+                        head1 = bytearray.fromhex("4766783200000020000000070000000100000002000000000000000000000000424C4B7B0000002000000001000000000000000B0000009C0000000000000000")
+                        head2 = bytearray.fromhex("424C4B7B0000002000000001000000000000000C") + flim.imageSize.to_bytes(4, 'big') + bytearray.fromhex("0000000000000000")
+                        head3 = bytearray.fromhex("424C4B7B00000020000000010000000000000001000000000000000000000000")
+
+                        info = bytearray(0x9C)
+
+                        info[:4] = (1).to_bytes(4, 'big')
+                        info[4:8] = flim.width.to_bytes(4, 'big')
+                        info[8:0xC] = flim.height.to_bytes(4, 'big')
+                        info[0xC:0x10] = (1).to_bytes(4, 'big')
+                        info[0x10:0x14] = (1).to_bytes(4, 'big')
+                        info[0x14:0x18] = flim.format.to_bytes(4, 'big')
+                        info[0x18:0x1C] = (0).to_bytes(4, 'big')
+                        info[0x1C:0x20] = (1).to_bytes(4, 'big')
+                        info[0x20:0x24] = flim.imageSize.to_bytes(4, 'big')
+                        info[0x24:0x28] = (0).to_bytes(4, 'big')
+                        info[0x28:0x2C] = (0).to_bytes(4, 'big')
+                        info[0x2C:0x30] = (0).to_bytes(4, 'big')
+                        info[0x30:0x34] = (4).to_bytes(4, 'big')
+                        info[0x34:0x38] = flim.swizzle.to_bytes(4, 'big')
+                        info[0x38:0x3C] = flim.alignment.to_bytes(4, 'big')
+                        info[0x3C:0x40] = flim.pitch.to_bytes(4, 'big')
+                        info[0x40:0x4D] = bytearray(0xD)
+                        info[0x4D:0x78] = bytearray(0x2B)
+                        info[0x78:0x7C] = (1).to_bytes(4, 'big')
+                        info[0x7C:0x80] = (0).to_bytes(4, 'big')
+                        info[0x80:0x84] = (1).to_bytes(4, 'big')
+                        info[0x84:0x88] = (0x10203).to_bytes(4, 'big')
+                        info[0x88:0x9C] = bytearray(0x14)
+
+                        file = head1 + info + head2 + flim.data + head3
+
+                        with open(name + "2.gtx", "wb") as output:
+                            output.write(file)
+                            output.close()
+
+                        print("")
+                        os.system('C:\Tex\TexConv2.exe -i "' + name + '2.gtx" -f GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM -o "' + name + '.gtx"')
+                        os.system('C:\Tex\gtx_extract.exe "' + name + '.gtx"')
+
+                        try:
+                            os.remove(name + '.gtx')
+                        except FileNotFoundError:
+                            os.system('C:\Tex\TexConv2.exe -i "' + name + '2.gtx" -o "' + name + '.dds"')
+
+                        os.remove(name + '2.gtx')
+
+                    menubar.destroy()
+                    filemenu.destroy()
+
+    messagebox.showinfo("", "Done!")
+
 def openfile():
     options = {}
     options['filetypes'] = [('BFLIM files', '.bflim')]
@@ -405,7 +572,59 @@ def openfile():
                 print("")
                 os.system('C:\Tex\TexConv2.exe -i "' + name + '2.gtx" -f GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM -o "' + name + '.gtx"')
                 os.system('C:\Tex\gtx_extract.exe "' + name + '.gtx"')
-                os.remove(name + '.gtx')
+
+                try:
+                    os.remove(name + '.gtx')
+                except FileNotFoundError:
+                    os.system('C:\Tex\TexConv2.exe -i "' + name + '2.gtx" -o "' + name + '.dds"')
+
+                    if flim.format == 0x823:
+                        format_ = 116
+                    elif flim.format == 0x1f:
+                        format_ = 36
+                    elif flim.format == 0x820:
+                        format_ = 113
+                    elif (flim.format == 0x1a or flim.format == 0x41a):
+                        format_ = 32
+                    elif flim.format == 0x19:
+                        format_ = 31
+                    elif flim.format == 0x8:
+                        format_ = 23
+                    elif flim.format == 0xa:
+                        format_ = 25
+                    elif flim.format == 0xb:
+                        format_ = 26
+                    elif flim.format == 0x1:
+                        format_ = 50
+                    elif flim.format == 0x7:  # I'm not sure about this, but this is what Random Talking Bush said. :/
+                        format_ = 51
+                    elif flim.format == 0x2:
+                        format_ = 52
+                    elif flim.format == 0x31:
+                        format_ = "BC1"
+                    elif flim.format == 0x32:
+                        format_ = "BC2"
+                    elif flim.format == 0x33:
+                        format_ = "BC3"
+                    elif flim.format == 0x34:
+                        format_ = "BC4U"
+                    elif flim.format == 0x35:
+                        format_ = "BC5U"
+
+                    if (flim.format != 0x31 and flim.format != 0x32 and flim.format != 0x33 and flim.format != 0x34 and flim.format != 0x35):
+                        hdr = writeHeader(1, flim.width, flim.height, format_, compressed=False)
+                    else:
+                        hdr = writeHeader(1, flim.width, flim.height, format_, compressed=True)
+
+                    with open(name + ".dds", "rb") as output:
+                        out = bytearray(output.read())
+                        output.close()
+
+                    with open(name + ".dds", "wb") as output:
+                        out[:0x80] = hdr
+                        output.write(out)
+                        output.close()
+
                 os.remove(name + '2.gtx')
 
             tv = 'Replace "' + os.path.basename(name) + '"'
@@ -416,6 +635,147 @@ def openfile():
             filemenu.destroy()
 
             messagebox.showinfo("", "Done!")
+
+def writeHeader(num_mipmaps, w, h, format_, compressed=False):
+    hdr = bytearray(128)
+
+    if format_ == 116:
+        fourcc = 116 .to_bytes(4, 'little')
+    elif format_ == 36:
+        fourcc = 36 .to_bytes(4, 'little')
+    elif format_ == 113:
+        fourcc = 113 .to_bytes(4, 'little')
+    elif format_ == 32:
+        fmtbpp = 4
+        has_alpha = 1
+        rmask = 0x000000ff
+        gmask = 0x0000ff00
+        bmask = 0x00ff0000
+        amask = 0xff000000
+    elif format_ == 31:
+        fmtbpp = 4
+        has_alpha = 1
+        rmask = 0x000003ff
+        gmask = 0x000ffc00
+        bmask = 0x3ff00000
+        amask = 0xc0000000
+    elif format_ == 23:
+        fmtbpp = 2
+        has_alpha = 0
+        rmask = 0x0000001f
+        gmask = 0x000007e0
+        bmask = 0x0000f800
+        amask = 0x00000000
+    elif format_ == 25:
+        fmtbpp = 2
+        has_alpha = 1
+        rmask = 0x0000001f
+        gmask = 0x000003e0
+        bmask = 0x00007c00
+        amask = 0x00008000
+    elif format_ == 26:
+        fmtbpp = 2
+        has_alpha = 1
+        rmask = 0x0000000f
+        gmask = 0x000000f0
+        bmask = 0x00000f00
+        amask = 0x0000f000
+    elif format_ == 50:
+        fmtbpp = 1
+        has_alpha = 0
+        rmask = 0x000000ff
+        gmask = 0x000000ff
+        bmask = 0x000000ff
+        amask = 0x00000000
+    elif format_ == 51:
+        fmtbpp = 2
+        has_alpha = 1
+        rmask = 0x000000ff
+        gmask = 0x000000ff
+        bmask = 0x000000ff
+        amask = 0x0000ff00
+
+    hdr[:4] = b'DDS '
+    hdr[4:4+4] = 124 .to_bytes(4, 'little')
+    hdr[12:12+4] = h.to_bytes(4, 'little')
+    hdr[16:16+4] = w.to_bytes(4, 'little')
+    hdr[76:76+4] = 32 .to_bytes(4, 'little')
+
+    if not compressed:
+        hdr[88:88+4] = (fmtbpp << 3).to_bytes(4, 'little')
+        hdr[92:92+4] = rmask.to_bytes(4, 'little')
+        hdr[96:96+4] = gmask.to_bytes(4, 'little')
+        hdr[100:100+4] = bmask.to_bytes(4, 'little')
+        hdr[104:104+4] = amask.to_bytes(4, 'little')
+
+    flags = (0x00000001) | (0x00001000) | (0x00000004) | (0x00000002)
+
+    caps = (0x00001000)
+
+    if num_mipmaps != 1:
+        flags |= (0x00020000)
+        caps |= ((0x00000008) | (0x00400000))
+    elif num_mipmaps == 0: # This shouldn't be happening... :/
+        print('')
+        print('Invalid num_mipmaps value: 0')
+        print('Changing value to 1 and continuing...')
+        num_mipmaps = 1
+
+    hdr[28:28+4] = num_mipmaps.to_bytes(4, 'little')
+    hdr[108:108+4] = caps.to_bytes(4, 'little')
+
+    if not compressed:
+        flags |= (0x00000008)
+
+        if format_ == 28:
+            pflags = (0x00000002)
+        elif (format_ == 36 or format_ == 113 or format_ == 116):
+            pflags = (0x00000004)
+        else:
+            if (((fmtbpp == 1) or (format_ == 51)) and (format_ != 27)):
+                pflags = (0x00020000)
+            else:
+                pflags = (0x00000040)
+
+        if has_alpha != 0:
+            pflags |= (0x00000001)
+
+        hdr[8:8+4] = flags.to_bytes(4, 'little')
+        hdr[20:20+4] = (w * fmtbpp).to_bytes(4, 'little') # pitch
+        hdr[80:80+4] = pflags.to_bytes(4, 'little')
+
+    else:
+        flags |= (0x00080000)
+        pflags = (0x00000004)
+
+        if format_ == "BC1":
+            fourcc = b'DXT1'
+        elif format_ == "BC2":
+            fourcc = b'DXT3'
+        elif format_ == "BC3":
+            fourcc = b'DXT5'
+        elif format_ == "BC4U":
+            fourcc = b'BC4U'
+        elif format_ == "BC4S":
+            fourcc = b'BC4S'
+        elif format_ == "BC5U":
+            fourcc = b'ATI2'
+        elif format_ == "BC5S":
+            fourcc = b'BC5S'
+
+        hdr[8:8+4] = flags.to_bytes(4, 'little')
+        hdr[80:80+4] = pflags.to_bytes(4, 'little')
+        hdr[84:84+4] = fourcc
+
+        size = ((w + 3) >> 2) * ((h + 3) >> 2)
+        if (format_ == "BC1" or format_ == "BC4"):
+            size *= 8
+        else:
+            size *= 16
+
+        hdr[20:20+4] = size.to_bytes(4, 'little') # linear size
+
+    return hdr
 
 def onFrameConfigure(canvas):
     '''Reset the scroll region to encompass the inner frame'''
@@ -529,8 +889,9 @@ def main():
                 shutil.move(source2, destination)
                 shutil.move(source3, destination)
         
-    top.title("BFLIM Tool v0.1")
-    filemenu.add_command(label="Open", command=openfile)
+    top.title("BFLIM Tool v0.2")
+    filemenu.add_command(label="Open File", command=openfile)
+    filemenu.add_command(label="Open Folder", command=openfolder)
     menubar.add_cascade(label="File", menu=filemenu)
 
     top.config(menu=menubar)
