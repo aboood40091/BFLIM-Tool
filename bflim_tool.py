@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # BFLIM Tool
-# Version 0.2
+# Version 1.0
 # Copyright © 2017 AboodXD
 
 # This file is part of BFLIM Tool.
@@ -29,6 +29,7 @@ from tkinter import Tk, Frame, Button, Canvas, Scrollbar, Menu
 from tkinter.filedialog import askopenfilename, askdirectory
 import tkinter.messagebox as messagebox
 import urllib.request
+import warnings
 import zipfile
 
 top = Tk()
@@ -37,93 +38,27 @@ frame = Frame(canvas)
 menubar = Menu(top)
 filemenu = Menu(menubar, tearoff=0)
 
-formats = {0x00000000: 'GX2_SURFACE_FORMAT_INVALID',
-           0x00000001: 'GX2_SURFACE_FORMAT_TC_R8_UNORM',
-           0x00000101: 'GX2_SURFACE_FORMAT_TC_R8_UINT',
-           0x00000201: 'GX2_SURFACE_FORMAT_TC_R8_SNORM',
-           0x00000301: 'GX2_SURFACE_FORMAT_TC_R8_SINT',
-           0x00000002: 'GX2_SURFACE_FORMAT_T_R4_G4_UNORM',
-           0x00000005: 'GX2_SURFACE_FORMAT_TCD_R16_UNORM',
-           0x00000105: 'GX2_SURFACE_FORMAT_TC_R16_UINT',
-           0x00000205: 'GX2_SURFACE_FORMAT_TC_R16_SNORM',
-           0x00000305: 'GX2_SURFACE_FORMAT_TC_R16_SINT',
-           0x00000806: 'GX2_SURFACE_FORMAT_TC_R16_FLOAT',
-           0x00000007: 'GX2_SURFACE_FORMAT_TC_R8_G8_UNORM',
-           0x00000107: 'GX2_SURFACE_FORMAT_TC_R8_G8_UINT',
-           0x00000207: 'GX2_SURFACE_FORMAT_TC_R8_G8_SNORM',
-           0x00000307: 'GX2_SURFACE_FORMAT_TC_R8_G8_SINT',
-           0x00000008: 'GX2_SURFACE_FORMAT_TCS_R5_G6_B5_UNORM',
-           0x0000000a: 'GX2_SURFACE_FORMAT_TC_R5_G5_B5_A1_UNORM',
-           0x0000000b: 'GX2_SURFACE_FORMAT_TC_R4_G4_B4_A4_UNORM',
-           0x0000000c: 'GX2_SURFACE_FORMAT_TC_A1_B5_G5_R5_UNORM',
-           0x0000010d: 'GX2_SURFACE_FORMAT_TC_R32_UINT',
-           0x0000030d: 'GX2_SURFACE_FORMAT_TC_R32_SINT',
-           0x0000080e: 'GX2_SURFACE_FORMAT_TCD_R32_FLOAT',
-           0x0000000f: 'GX2_SURFACE_FORMAT_TC_R16_G16_UNORM',
-           0x0000010f: 'GX2_SURFACE_FORMAT_TC_R16_G16_UINT',
-           0x0000020f: 'GX2_SURFACE_FORMAT_TC_R16_G16_SNORM',
-           0x0000030f: 'GX2_SURFACE_FORMAT_TC_R16_G16_SINT',
-           0x00000810: 'GX2_SURFACE_FORMAT_TC_R16_G16_FLOAT',
-           0x00000011: 'GX2_SURFACE_FORMAT_D_D24_S8_UNORM',
-           0x00000011: 'GX2_SURFACE_FORMAT_T_R24_UNORM_X8',
-           0x00000111: 'GX2_SURFACE_FORMAT_T_X24_G8_UINT',
-           0x00000811: 'GX2_SURFACE_FORMAT_D_D24_S8_FLOAT',
-           0x00000816: 'GX2_SURFACE_FORMAT_TC_R11_G11_B10_FLOAT',
-           0x00000019: 'GX2_SURFACE_FORMAT_TCS_R10_G10_B10_A2_UNORM',
-           0x00000119: 'GX2_SURFACE_FORMAT_TC_R10_G10_B10_A2_UINT',
-           0x00000219: 'GX2_SURFACE_FORMAT_T_R10_G10_B10_A2_SNORM',
-           0x00000219: 'GX2_SURFACE_FORMAT_TC_R10_G10_B10_A2_SNORM',
-           0x00000319: 'GX2_SURFACE_FORMAT_TC_R10_G10_B10_A2_SINT',
-           0x0000001a: 'GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM',
-           0x0000011a: 'GX2_SURFACE_FORMAT_TC_R8_G8_B8_A8_UINT',
-           0x0000021a: 'GX2_SURFACE_FORMAT_TC_R8_G8_B8_A8_SNORM',
-           0x0000031a: 'GX2_SURFACE_FORMAT_TC_R8_G8_B8_A8_SINT',
-           0x0000041a: 'GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_SRGB',
-           0x0000001b: 'GX2_SURFACE_FORMAT_TCS_A2_B10_G10_R10_UNORM',
-           0x0000011b: 'GX2_SURFACE_FORMAT_TC_A2_B10_G10_R10_UINT',
-           0x0000081c: 'GX2_SURFACE_FORMAT_D_D32_FLOAT_S8_UINT_X24',
-           0x0000081c: 'GX2_SURFACE_FORMAT_T_R32_FLOAT_X8_X24',
-           0x0000011c: 'GX2_SURFACE_FORMAT_T_X32_G8_UINT_X24',
-           0x0000011d: 'GX2_SURFACE_FORMAT_TC_R32_G32_UINT',
-           0x0000031d: 'GX2_SURFACE_FORMAT_TC_R32_G32_SINT',
-           0x0000081e: 'GX2_SURFACE_FORMAT_TC_R32_G32_FLOAT',
-           0x0000001f: 'GX2_SURFACE_FORMAT_TC_R16_G16_B16_A16_UNORM',
-           0x0000011f: 'GX2_SURFACE_FORMAT_TC_R16_G16_B16_A16_UINT',
-           0x0000021f: 'GX2_SURFACE_FORMAT_TC_R16_G16_B16_A16_SNORM',
-           0x0000031f: 'GX2_SURFACE_FORMAT_TC_R16_G16_B16_A16_SINT',
-           0x00000820: 'GX2_SURFACE_FORMAT_TC_R16_G16_B16_A16_FLOAT',
-           0x00000122: 'GX2_SURFACE_FORMAT_TC_R32_G32_B32_A32_UINT',
-           0x00000322: 'GX2_SURFACE_FORMAT_TC_R32_G32_B32_A32_SINT',
-           0x00000823: 'GX2_SURFACE_FORMAT_TC_R32_G32_B32_A32_FLOAT',
-           0x00000031: 'GX2_SURFACE_FORMAT_T_BC1_UNORM',
-           0x00000431: 'GX2_SURFACE_FORMAT_T_BC1_SRGB',
-           0x00000032: 'GX2_SURFACE_FORMAT_T_BC2_UNORM',
-           0x00000432: 'GX2_SURFACE_FORMAT_T_BC2_SRGB',
-           0x00000033: 'GX2_SURFACE_FORMAT_T_BC3_UNORM',
-           0x00000433: 'GX2_SURFACE_FORMAT_T_BC3_SRGB',
-           0x00000034: 'GX2_SURFACE_FORMAT_T_BC4_UNORM',
-           0x00000234: 'GX2_SURFACE_FORMAT_T_BC4_SNORM',
-           0x00000035: 'GX2_SURFACE_FORMAT_T_BC5_UNORM',
-           0x00000235: 'GX2_SURFACE_FORMAT_T_BC5_SNORM',
-           0x00000081: 'GX2_SURFACE_FORMAT_T_NV12_UNORM'}
+formats = {0x01: 'GX2_SURFACE_FORMAT_TC_R8_UNORM',
+           0x07: 'GX2_SURFACE_FORMAT_TC_R8_G8_UNORM',
+           0x08: 'GX2_SURFACE_FORMAT_TCS_R5_G6_B5_UNORM',
+           0x1a: 'GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM',
+           0x31: 'GX2_SURFACE_FORMAT_T_BC1_UNORM',
+           0x32: 'GX2_SURFACE_FORMAT_T_BC2_UNORM',
+           0x33: 'GX2_SURFACE_FORMAT_T_BC3_UNORM',
+           0x34: 'GX2_SURFACE_FORMAT_T_BC4_UNORM',
+           0x35: 'GX2_SURFACE_FORMAT_T_BC5_UNORM'}
 
-tileModes = {0x00: 'GX2_TILE_MODE_DEFAULT',
-             0x01: 'GX2_TILE_MODE_LINEAR_ALIGNED',
-             0x02: 'GX2_TILE_MODE_1D_TILED_THIN1',
-             0x03: 'GX2_TILE_MODE_1D_TILED_THICK',
-             0x04: 'GX2_TILE_MODE_2D_TILED_THIN1',
-             0x05: 'GX2_TILE_MODE_2D_TILED_THIN2',
-             0x06: 'GX2_TILE_MODE_2D_TILED_THIN4',
-             0x07: 'GX2_TILE_MODE_2D_TILED_THICK',
-             0x08: 'GX2_TILE_MODE_2B_TILED_THIN1',
-             0x09: 'GX2_TILE_MODE_2B_TILED_THIN2',
-             0x0a: 'GX2_TILE_MODE_2B_TILED_THIN4',
-             0x0b: 'GX2_TILE_MODE_2B_TILED_THICK',
-             0x0c: 'GX2_TILE_MODE_3D_TILED_THIN1',
-             0x0d: 'GX2_TILE_MODE_3D_TILED_THICK',
-             0x0e: 'GX2_TILE_MODE_3B_TILED_THIN1',
-             0x0f: 'GX2_TILE_MODE_3B_TILED_THICK',
-             0x10: 'GX2_TILE_MODE_LINEAR_SPECIAL'}
+formats2 = {0x01: 'L8',
+            0x07: 'L8A8',
+            0x08: 'R5G6B5 / RGB565',
+            0x1a: 'ARGB8 / ABGR8',
+            0x31: 'BC1 / DXT1',
+            0x32: 'BC2 / DXT3',
+            0x33: 'BC3 / DXT5',
+            0x34: 'BC4 / ATI1',
+            0x35: 'BC5 / ATI2'}
+
+tileModes = {0x04: 'GX2_TILE_MODE_2D_TILED_THIN1'}
 
 formatHwInfo = b"\x00\x00\x00\x01\x08\x03\x00\x01\x08\x01\x00\x01\x00\x00\x00\x01" \
     b"\x00\x00\x00\x01\x10\x07\x00\x00\x10\x03\x00\x01\x10\x03\x00\x01" \
@@ -170,12 +105,14 @@ def DDStoBFLIM(flim, dds, f):
 
     name = os.path.splitext(dds)[0]
 
+    print('C:\Tex\TexConv2.exe -i "' + dds + '" -o "' + name + '.gtx"')
     os.system('C:\Tex\TexConv2.exe -i "' + dds + '" -o "' + name + '.gtx"')
 
     swizzle = (flim.swizzle & 0xFFF) >> 8
     format_ = flim.format
     tileMode = 4
 
+    print('C:\Tex\TexConv2.exe -i "' + name + '.gtx" -f ' + formats[format_] + ' -tileMode ' + tileModes[tileMode] + ' -swizzle ' + str(swizzle) + ' -o "' + name + '2.gtx"')
     os.system('C:\Tex\TexConv2.exe -i "' + name + '.gtx" -f ' + formats[format_] + ' -tileMode ' + tileModes[tileMode] + ' -swizzle ' + str(swizzle) + ' -o "' + name + '2.gtx"')
 
     os.remove(name + '.gtx')
@@ -482,7 +419,7 @@ def openfile():
             elif info.format_ == 0x00000011:
                 flim.format = 0x00000035
             elif info.format_ == 0x00000012:
-                flim.format = 0x00000030
+                flim.format = 0x00000031
 
             flim.imageSize = info.imageSize
 
@@ -627,8 +564,8 @@ def openfile():
 
                 os.remove(name + '2.gtx')
 
-            tv = 'Replace "' + os.path.basename(name) + '"'
-            b = Button(frame, text=tv, command=lambda : DDStoBFLIM(flim, askopenfilename(parent=top, filetypes=options['filetypes']), filename))
+            tv = 'Replace "' + os.path.basename(name) + '"\n' + formats2[flim.format]
+            b = Button(frame, text=tv, command=lambda flim=flim : DDStoBFLIM(flim, askopenfilename(parent=top, filetypes=options['filetypes']), filename))
             b.pack(padx=1, pady=1)
             
             menubar.destroy()
@@ -787,7 +724,9 @@ def main():
 
     print("(C) 2017 AboodXD")
 
-    if not os.path.isfile("C:\Tex\gtx_extract.exe"):
+    warnings.filterwarnings("ignore")
+
+    if not os.path.isfile("C:\Tex\\new.txt"):
         print("")
         print("Downloading the necessary tools...")
 
@@ -799,56 +738,11 @@ def main():
             if not os.path.isdir("C:\Tex"):
                 os.mkdir("C:\Tex")
 
-            print("")
-            print("Fetching GTX Extractor... ")
-            print("")
-            response = requests.get('https://github.com/aboood40091/GTX-Extractor/', verify=False)
-
-            if (int(response.status_code)) == 200:
-                print("Connected to the download page!")
-
-            else:
-                response = requests.get('https://www.google.com', verify=False)
-                if (int(response.status_code)) == 200:
-                    print("")
-                    print("It seems that the download page is down. Try restarting BFLIM Tool and check if it still doesn't work.")
-                    print("")
-                    print("Exiting in 5 seconds...")
-                    time.sleep(5)
-                    sys.exit(1)
-
-                else:
-                    print("")
-                    print("It looks like you don't have a working internet connection. Connect to another network, or solve the connection problem.")
-                    print("")
-                    print("Exiting in 5 seconds...")
-                    time.sleep(5)
-                    sys.exit(1)
-
-            print("")
-            print("Downloading...")
-            urllib.request.urlretrieve("https://github.com/aboood40091/GTX-Extractor/releases/download/v4.0/gtx_extract_x64_v4.0.zip", "gtx_extract.zip")
-            print("Download completed!")
-            print("")
-            print("Unzipping...")
-            
-            zip = zipfile.ZipFile(r'gtx_extract.zip')  
-            zip.extractall(r'C:\Tex')
-            
-            print("File succesfully unzipped!")
-            print("")
-            print("Removing zipped file...")
-            
-            zip.close()
-            os.remove("gtx_extract.zip")
-            
-            print("Zipped file succesfully removed!")
-
-            if not os.path.isfile("C:\Tex\TexConv2.exe"):
+            if not os.path.isfile("C:\Tex\gtx_extract.exe"):
                 print("")
-                print("Fetching TexConv2... ")
+                print("Fetching GTX Extractor... ")
                 print("")
-                response = requests.get('https://github.com/NWPlayer123/WiiUTools/tree/master/TexHaxU', verify=False)
+                response = requests.get('https://github.com/aboood40091/GTX-Extractor/', verify=False)
 
                 if (int(response.status_code)) == 200:
                     print("Connected to the download page!")
@@ -873,23 +767,86 @@ def main():
 
                 print("")
                 print("Downloading...")
-                urllib.request.urlretrieve("https://github.com/NWPlayer123/WiiUTools/raw/master/TexHaxU/gfd.dll", "gfd.dll")
-                urllib.request.urlretrieve("https://github.com/NWPlayer123/WiiUTools/raw/master/TexHaxU/TexConv2.exe", "TexConv2.exe")
-                urllib.request.urlretrieve("https://github.com/NWPlayer123/WiiUTools/raw/master/TexHaxU/texUtils.dll", "texUtils.dll")
+                urllib.request.urlretrieve("https://github.com/aboood40091/GTX-Extractor/releases/download/v4.0/gtx_extract_x64_v4.0.zip", "gtx_extract.zip")
                 print("Download completed!")
-
                 print("")
-                print("Moving files...")
-                source1 = "gfd.dll"
-                source2 = "TexConv2.exe"
-                source3 = "texUtils.dll"
-                destination = "C:\Tex"
+                print("Unzipping...")
                 
+                zip = zipfile.ZipFile(r'gtx_extract.zip')  
+                zip.extractall(r'C:\Tex')
+                
+                print("File succesfully unzipped!")
+                print("")
+                print("Removing zipped file...")
+                
+                zip.close()
+                os.remove("gtx_extract.zip")
+                
+                print("Zipped file succesfully removed!")
+
+            print("")
+            print("Fetching TexConv2... ")
+            print("")
+            response = requests.get('https://github.com/aboood40091/WiiUTools/tree/master/TexHaxU', verify=False)
+
+            if (int(response.status_code)) == 200:
+                print("Connected to the download page!")
+
+            else:
+                response = requests.get('https://www.google.com', verify=False)
+                if (int(response.status_code)) == 200:
+                    print("")
+                    print("It seems that the download page is down. Try restarting BFLIM Tool and check if it still doesn't work.")
+                    print("")
+                    print("Exiting in 5 seconds...")
+                    time.sleep(5)
+                    sys.exit(1)
+
+                else:
+                    print("")
+                    print("It looks like you don't have a working internet connection. Connect to another network, or solve the connection problem.")
+                    print("")
+                    print("Exiting in 5 seconds...")
+                    time.sleep(5)
+                    sys.exit(1)
+
+            print("")
+            print("Downloading...")
+            urllib.request.urlretrieve("https://github.com/aboood40091/WiiUTools/raw/master/TexHaxU/gfd.dll", "gfd.dll")
+            urllib.request.urlretrieve("https://github.com/aboood40091/WiiUTools/raw/master/TexHaxU/TexConv2.exe", "TexConv2.exe")
+            urllib.request.urlretrieve("https://github.com/aboood40091/WiiUTools/raw/master/TexHaxU/texUtils.dll", "texUtils.dll")
+            print("Download completed!")
+
+            print("")
+            print("Moving files...")
+            source1 = "gfd.dll"
+            source2 = "TexConv2.exe"
+            source3 = "texUtils.dll"
+            destination = "C:\Tex"
+            
+            if not os.path.isfile(destination + '/' + source1):
                 shutil.move(source1, destination)
+            else:
+                os.remove(destination + '/' + source1)
+                shutil.move(source1, destination)
+
+            if not os.path.isfile(destination + '/' + source2):
                 shutil.move(source2, destination)
+            else:
+                os.remove(destination + '/' + source2)
+                shutil.move(source2, destination)
+
+            if not os.path.isfile(destination + '/' + source3):
                 shutil.move(source3, destination)
+            else:
+                os.remove(destination + '/' + source3)
+                shutil.move(source3, destination)
+
+            with open("C:\Tex\\new.txt", "wb") as txt:
+                txt.write(b'')
+                txt.close()
         
-    top.title("BFLIM Tool v0.2")
+    top.title("BFLIM Tool v1.0")
     filemenu.add_command(label="Open File", command=openfile)
     filemenu.add_command(label="Open Folder", command=openfolder)
     menubar.add_cascade(label="File", menu=filemenu)
