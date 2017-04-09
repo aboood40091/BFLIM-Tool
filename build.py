@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # BFLIM Tool
-# Version 0.2
+# Version 1.0
 # Copyright © 2017 AboodXD
 
 # This file is part of BFLIM Tool.
@@ -25,7 +25,7 @@
 import os, shutil, sys
 from cx_Freeze import setup, Executable
 
-version = '0.2'
+version = '1.0'
 
 # Pick a build directory
 dir_ = 'bflim_tool v' + version
@@ -39,6 +39,8 @@ print('>> Clearing/creating directory...')
 if os.path.isdir(dir_): shutil.rmtree(dir_)
 os.makedirs(dir_)
 print('>> Directory ready!')
+
+base = 'Win32GUI' if sys.platform == 'win32' else None
 
 setup(
     name = 'BFLIM Tool',
@@ -54,6 +56,7 @@ setup(
     executables = [
         Executable(
             'bflim_tool.py',
+            base = base,
             ),
         ],
     )
