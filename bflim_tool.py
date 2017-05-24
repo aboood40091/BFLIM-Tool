@@ -30,7 +30,6 @@ from tkinter.filedialog import askopenfilename, askdirectory
 import tkinter.messagebox as messagebox
 import urllib.request
 import warnings
-import zipfile
 
 top = Tk()
 canvas = Canvas(top)
