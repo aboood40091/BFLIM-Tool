@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # BFLIM Tool
-# Version 1.0
+# Version 1.1
 # Copyright © 2017 AboodXD
 
 # This file is part of BFLIM Tool.
@@ -48,6 +48,8 @@ formats = {0x01: 'GX2_SURFACE_FORMAT_TC_R8_UNORM',
            0x34: 'GX2_SURFACE_FORMAT_T_BC4_UNORM',
            0x35: 'GX2_SURFACE_FORMAT_T_BC5_UNORM'}
 
+BCn_formats = [0x31, 0x431, 0x32, 0x432, 0x33, 0x433, 0x34, 0x35]
+
 formats2 = {0x01: 'L8',
             0x07: 'L8A8',
             0x08: 'R5G6B5 / RGB565',
@@ -55,8 +57,8 @@ formats2 = {0x01: 'L8',
             0x31: 'BC1 / DXT1',
             0x32: 'BC2 / DXT3',
             0x33: 'BC3 / DXT5',
-            0x34: 'BC4 / ATI1',
-            0x35: 'BC5 / ATI2'}
+            0x34: 'BC4U / ATI1',
+            0x35: 'BC5U / ATI2'}
 
 formatHwInfo = b"\x00\x00\x00\x01\x08\x03\x00\x01\x08\x01\x00\x01\x00\x00\x00\x01" \
     b"\x00\x00\x00\x01\x10\x07\x00\x00\x10\x03\x00\x01\x10\x03\x00\x01" \
@@ -118,12 +120,12 @@ def DDStoBFLIM(flim, dds, f):
 
     name = os.path.splitext(dds)[0]
 
-    os.system('C:\Tex\TexConv2.exe -i "' + dds + '" -o "' + name + '.gtx"')
+    os.system('C:/Tex/TexConv2.exe -i "' + dds + '" -o "' + name + '.gtx"')
 
     swizzle = (flim.swizzle & 0xFFF) >> 8
     format_ = flim.format
 
-    os.system('C:\Tex\TexConv2.exe -i "' + name + '.gtx" -f ' + formats[format_] + ' -tileMode GX2_TILE_MODE_2D_TILED_THIN1 -swizzle ' + str(swizzle) + ' -o "' + name + '2.gtx"')
+    os.system('C:/Tex/TexConv2.exe -i "' + name + '.gtx" -f ' + formats[format_] + ' -tileMode GX2_TILE_MODE_2D_TILED_THIN1 -swizzle ' + str(swizzle) + ' -o "' + name + '2.gtx"')
 
     os.remove(name + '.gtx')
 
@@ -236,7 +238,7 @@ def openfolder():
                         flim.format = 0
 
                     if flim.format == 0:
-                        messagebox.showinfo("", "Unsupported format!")
+                        pass
                     else:
                         flim.imageSize = info.imageSize
 
@@ -312,13 +314,44 @@ def openfolder():
                                 output.close()
 
                             print("")
-                            os.system('C:\Tex\TexConv2.exe -i "' + name + '2.gtx" -f GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM -o "' + name + '.gtx"')
-                            os.system('C:\Tex\gtx_extract.exe "' + name + '.gtx"')
+                            os.system('C:/Tex/TexConv2.exe -i "' + name + '2.gtx" -f GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM -o "' + name + '.gtx"')
+                            os.system('C:/Tex/gtx_extract.exe "' + name + '.gtx"')
 
                             try:
                                 os.remove(name + '.gtx')
                             except FileNotFoundError:
-                                os.system('C:\Tex\TexConv2.exe -i "' + name + '2.gtx" -o "' + name + '.dds"')
+                                os.system('C:/Tex/TexConv2.exe -i "' + name + '2.gtx" -o "' + name + '.dds"')
+
+                                if os.path.isfile(name + '.dds'):
+                                    if flim.format == 0x01:
+                                        format_ = 61
+                                    elif flim.format == 0x07:
+                                        format_ = 49
+                                    elif flim.format == 0x08:
+                                        format_ = 85
+                                    elif flim.format == 0x1a:
+                                        format_ = 28
+                                    elif flim.format == 0x31:
+                                        format_ = "BC1"
+                                    elif flim.format == 0x32:
+                                        format_ = "BC2"
+                                    elif flim.format == 0x33:
+                                        format_ = "BC3"
+                                    elif flim.format == 0x34:
+                                        format_ = "BC4U"
+                                    elif flim.format == 0x35:
+                                        format_ = "BC5U"
+
+                                    hdr = writeHeader(1, flim.width, flim.height, format_, flim.format in BCn_formats)
+
+                                    with open(name + ".dds", "rb") as output:
+                                        out = bytearray(output.read())
+                                        output.close()
+
+                                    with open(name + ".dds", "wb") as output:
+                                        out[:0x80] = hdr
+                                        output.write(out)
+                                        output.close()
 
                             os.remove(name + '2.gtx')
 
@@ -404,7 +437,6 @@ def openfile():
 
                 flim.swizzle = info.swizzle
                 flim.swizzle = (((flim.swizzle & 0xF0) >> 4) // 2) << 8
-                assert info.swizzle == ((((flim.swizzle >> 8) * 2) << 4) & 0xF0) + 4
 
                 flim.alignment = info.alignment
 
@@ -446,6 +478,8 @@ def openfile():
 
                 name = os.path.splitext(filename)[0]
 
+                ugh = False
+
                 if os.path.isfile(name + ".dds"):
                     pass
                 else:
@@ -486,83 +520,113 @@ def openfile():
                         output.close()
 
                     print("")
-                    os.system('C:\Tex\TexConv2.exe -i "' + name + '2.gtx" -f GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM -o "' + name + '.gtx"')
-                    os.system('C:\Tex\gtx_extract.exe "' + name + '.gtx"')
+                    os.system('C:/Tex/TexConv2.exe -i "' + name + '2.gtx" -f GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM -o "' + name + '.gtx"')
+                    os.system('C:/Tex/gtx_extract.exe "' + name + '.gtx"')
 
                     try:
                         os.remove(name + '.gtx')
                     except FileNotFoundError:
-                        os.system('C:\Tex\TexConv2.exe -i "' + name + '2.gtx" -o "' + name + '.dds"')
+                        os.system('C:/Tex/TexConv2.exe -i "' + name + '2.gtx" -o "' + name + '.dds"')
 
-                        if flim.format == 0x01:
-                            format_ = 50
-                        elif flim.format == 0x07:
-                            format_ = 51
-                        elif flim.format == 0x08:
-                            format_ = 23
-                        elif flim.format == 0x1a:
-                            format_ = 32
-                        elif flim.format == 0x31:
-                            format_ = "BC1"
-                        elif flim.format == 0x32:
-                            format_ = "BC2"
-                        elif flim.format == 0x33:
-                            format_ = "BC3"
-                        elif flim.format == 0x34:
-                            format_ = "BC4U"
-                        elif flim.format == 0x35:
-                            format_ = "BC5U"
+                        if os.path.isfile(name + '.dds'):
+                            if flim.format == 0x01:
+                                format_ = 61
+                            elif flim.format == 0x07:
+                                format_ = 49
+                            elif flim.format == 0x08:
+                                format_ = 85
+                            elif flim.format == 0x1a:
+                                format_ = 28
+                            elif flim.format == 0x31:
+                                format_ = "BC1"
+                            elif flim.format == 0x32:
+                                format_ = "BC2"
+                            elif flim.format == 0x33:
+                                format_ = "BC3"
+                            elif flim.format == 0x34:
+                                format_ = "BC4U"
+                            elif flim.format == 0x35:
+                                format_ = "BC5U"
 
-                        if (flim.format != 0x31 and flim.format != 0x32 and flim.format != 0x33 and flim.format != 0x34 and flim.format != 0x35):
-                            hdr = writeHeader(1, flim.width, flim.height, format_, compressed=False)
+                            hdr = writeHeader(1, flim.width, flim.height, format_, flim.format in BCn_formats)
+
+                            with open(name + ".dds", "rb") as output:
+                                out = bytearray(output.read())
+                                output.close()
+
+                            with open(name + ".dds", "wb") as output:
+                                out[:0x80] = hdr
+                                output.write(out)
+                                output.close()
                         else:
-                            hdr = writeHeader(1, flim.width, flim.height, format_, compressed=True)
-
-                        with open(name + ".dds", "rb") as output:
-                            out = bytearray(output.read())
-                            output.close()
-
-                        with open(name + ".dds", "wb") as output:
-                            out[:0x80] = hdr
-                            output.write(out)
-                            output.close()
+                            messagebox.showinfo("Whoops", "Something went wrong!")
+                            ugh = True
 
                     os.remove(name + '2.gtx')
 
-                tv = 'Replace "' + os.path.basename(name) + '"\n' + formats2[flim.format]
-                b = Button(frame, text=tv, command=lambda flim=flim : DDStoBFLIM(flim, askopenfilename(parent=top, filetypes=options['filetypes']), filename))
-                b.pack(padx=1, pady=1)
-                
-                menubar.destroy()
-                filemenu.destroy()
+                if not ugh:
+                    tv = 'Replace "' + os.path.basename(name) + '"\n' + formats2[flim.format]
+                    b = Button(frame, text=tv, command=lambda flim=flim : DDStoBFLIM(flim, askopenfilename(parent=top, filetypes=options['filetypes']), filename))
+                    b.pack(padx=1, pady=1)
+                    
+                    menubar.destroy()
+                    filemenu.destroy()
 
-                messagebox.showinfo("", "Done!")
+                    messagebox.showinfo("", "Done!")
+                else:
+                    scr.destroy()
 
-def writeHeader(num_mipmaps, w, h, format_, compressed=False):
+# ----------\/-DDS writer-\/---------- #
+
+# Copyright © 2016-2017 AboodXD
+
+# Supported formats:
+#  -RGBA8
+#  -RGB10A2
+#  -RGB565
+#  -RGB5A1
+#  -RGBA4
+#  -L8
+#  -L8A8
+#  -L4A4
+#  -BC1_UNORM
+#  -BC2_UNORM
+#  -BC3_UNORM
+#  -BC4_UNORM
+#  -BC4_SNORM
+#  -BC5_UNORM
+#  -BC5_SNORM
+
+# Feel free to include this in your own program if you want, just give credits. :)
+
+def writeHeader(num_mipmaps, w, h, format_, compressed):
     hdr = bytearray(128)
 
-    if format_ == 32:
+    if format_ == 28: # RGBA8
         fmtbpp = 4
         has_alpha = 1
         rmask = 0x000000ff
         gmask = 0x0000ff00
         bmask = 0x00ff0000
         amask = 0xff000000
-    elif format_ == 23:
+
+    elif format_ == 85: # RGB565
         fmtbpp = 2
         has_alpha = 0
         rmask = 0x0000001f
         gmask = 0x000007e0
         bmask = 0x0000f800
         amask = 0x00000000
-    elif format_ == 50:
+
+    elif format_ == 61: # L8
         fmtbpp = 1
         has_alpha = 0
         rmask = 0x000000ff
         gmask = 0x000000ff
         bmask = 0x000000ff
         amask = 0x00000000
-    elif format_ == 51:
+
+    elif format_ == 49: # L8A8
         fmtbpp = 2
         has_alpha = 1
         rmask = 0x000000ff
@@ -570,54 +634,28 @@ def writeHeader(num_mipmaps, w, h, format_, compressed=False):
         bmask = 0x000000ff
         amask = 0x0000ff00
 
-    hdr[:4] = b'DDS '
-    hdr[4:4+4] = 124 .to_bytes(4, 'little')
-    hdr[12:12+4] = h.to_bytes(4, 'little')
-    hdr[16:16+4] = w.to_bytes(4, 'little')
-    hdr[76:76+4] = 32 .to_bytes(4, 'little')
-
-    if not compressed:
-        hdr[88:88+4] = (fmtbpp << 3).to_bytes(4, 'little')
-        hdr[92:92+4] = rmask.to_bytes(4, 'little')
-        hdr[96:96+4] = gmask.to_bytes(4, 'little')
-        hdr[100:100+4] = bmask.to_bytes(4, 'little')
-        hdr[104:104+4] = amask.to_bytes(4, 'little')
-
     flags = (0x00000001) | (0x00001000) | (0x00000004) | (0x00000002)
 
     caps = (0x00001000)
 
+    if num_mipmaps == 0: num_mipmaps = 1
     if num_mipmaps != 1:
         flags |= (0x00020000)
         caps |= ((0x00000008) | (0x00400000))
-    elif num_mipmaps == 0: # This shouldn't be happening... :/
-        print('')
-        print('Invalid num_mipmaps value: 0')
-        print('Changing value to 1 and continuing...')
-        num_mipmaps = 1
-
-    hdr[28:28+4] = num_mipmaps.to_bytes(4, 'little')
-    hdr[108:108+4] = caps.to_bytes(4, 'little')
 
     if not compressed:
         flags |= (0x00000008)
 
-        if format_ == 28:
-            pflags = (0x00000002)
-        elif (format_ == 36 or format_ == 113 or format_ == 116):
-            pflags = (0x00000004)
-        else:
-            if (((fmtbpp == 1) or (format_ == 51)) and (format_ != 27)):
-                pflags = (0x00020000)
-            else:
-                pflags = (0x00000040)
+        if (fmtbpp == 1 or format_ == 49): # LUMINANCE
+            pflags = (0x00020000)
+
+        else: # RGB
+            pflags = (0x00000040)
 
         if has_alpha != 0:
             pflags |= (0x00000001)
 
-        hdr[8:8+4] = flags.to_bytes(4, 'little')
-        hdr[20:20+4] = (w * fmtbpp).to_bytes(4, 'little') # pitch
-        hdr[80:80+4] = pflags.to_bytes(4, 'little')
+        size = w * fmtbpp
 
     else:
         flags |= (0x00080000)
@@ -631,24 +669,35 @@ def writeHeader(num_mipmaps, w, h, format_, compressed=False):
             fourcc = b'DXT5'
         elif format_ == "BC4U":
             fourcc = b'BC4U'
-        elif format_ == "BC4S":
-            fourcc = b'BC4S'
         elif format_ == "BC5U":
-            fourcc = b'ATI2'
-        elif format_ == "BC5S":
-            fourcc = b'BC5S'
-
-        hdr[8:8+4] = flags.to_bytes(4, 'little')
-        hdr[80:80+4] = pflags.to_bytes(4, 'little')
-        hdr[84:84+4] = fourcc
+            fourcc = b'BC5U'
 
         size = ((w + 3) >> 2) * ((h + 3) >> 2)
-        if (format_ == "BC1" or format_ == "BC4"):
+        if (format_ == "BC1" or format_ == "BC4U"):
             size *= 8
         else:
             size *= 16
 
-        hdr[20:20+4] = size.to_bytes(4, 'little') # linear size
+    hdr[:4] = b'DDS '
+    hdr[4:4+4] = 124 .to_bytes(4, 'little')
+    hdr[8:8+4] = flags.to_bytes(4, 'little')
+    hdr[12:12+4] = h.to_bytes(4, 'little')
+    hdr[16:16+4] = w.to_bytes(4, 'little')
+    hdr[20:20+4] = size.to_bytes(4, 'little')
+    hdr[28:28+4] = num_mipmaps.to_bytes(4, 'little')
+    hdr[76:76+4] = 32 .to_bytes(4, 'little')
+    hdr[80:80+4] = pflags.to_bytes(4, 'little')
+
+    if compressed:
+        hdr[84:84+4] = fourcc
+    else:
+        hdr[88:88+4] = (fmtbpp << 3).to_bytes(4, 'little')
+        hdr[92:92+4] = rmask.to_bytes(4, 'little')
+        hdr[96:96+4] = gmask.to_bytes(4, 'little')
+        hdr[100:100+4] = bmask.to_bytes(4, 'little')
+        hdr[104:104+4] = amask.to_bytes(4, 'little')
+
+    hdr[108:108+4] = caps.to_bytes(4, 'little')
 
     return hdr
 
@@ -662,129 +711,136 @@ def main():
 
     print("(C) 2017 AboodXD")
 
-    warnings.filterwarnings("ignore")
+    down = False
 
-    if not os.path.isfile("C:\Tex\\new.txt"):
+    files = ["C:/Tex/gfd.dll", "C:/Tex/gtx_extract.exe", "C:/Tex/TexConv2.exe", "C:/Tex/texUtils.dll"]
+
+    if not os.path.isfile("C:/Tex/new.txt"):
+        down = True
+    else:
+        for file in files:
+            if not os.path.isfile(file):
+                down = True
+        with open("C:/Tex/new.txt", "r") as txt:
+            if txt.read() != 'v3.1':
+                down = True
+
+    if down:
+        warnings.filterwarnings("ignore")
+
         print("")
         print("Downloading the necessary tools...")
 
-        if not os.path.isdir("C:\Program Files (x86)"):
-            print("")
-            print("It seems like you have a 32-bit computer... Good luck getting this to work on it!")
+        if not os.path.isdir("C:\Tex"):
+            os.mkdir("C:\Tex")
+
+        print("")
+        print("Fetching GTX Extractor (C ver.)... ")
+        print("")
+        response = requests.get('https://github.com/aboood40091/RandomStuff/', verify=False)
+
+        if (int(response.status_code)) == 200:
+            print("Connected to the download page!")
 
         else:
-            if not os.path.isdir("C:\Tex"):
-                os.mkdir("C:\Tex")
-
-            if not os.path.isfile("C:\Tex\gtx_extract.exe"):
-                print("")
-                print("Fetching GTX Extractor... ")
-                print("")
-                response = requests.get('https://github.com/aboood40091/GTX-Extractor/', verify=False)
-
-                if (int(response.status_code)) == 200:
-                    print("Connected to the download page!")
-
-                else:
-                    response = requests.get('https://www.google.com', verify=False)
-                    if (int(response.status_code)) == 200:
-                        print("")
-                        print("It seems that the download page is down. Try restarting BFLIM Tool and check if it still doesn't work.")
-                        print("")
-                        print("Exiting in 5 seconds...")
-                        time.sleep(5)
-                        sys.exit(1)
-
-                    else:
-                        print("")
-                        print("It looks like you don't have a working internet connection. Connect to another network, or solve the connection problem.")
-                        print("")
-                        print("Exiting in 5 seconds...")
-                        time.sleep(5)
-                        sys.exit(1)
-
-                print("")
-                print("Downloading...")
-                urllib.request.urlretrieve("https://github.com/aboood40091/GTX-Extractor/releases/download/v4.0/gtx_extract_x64_v4.0.zip", "gtx_extract.zip")
-                print("Download completed!")
-                print("")
-                print("Unzipping...")
-                
-                zip = zipfile.ZipFile(r'gtx_extract.zip')  
-                zip.extractall(r'C:\Tex')
-                
-                print("File succesfully unzipped!")
-                print("")
-                print("Removing zipped file...")
-                
-                zip.close()
-                os.remove("gtx_extract.zip")
-                
-                print("Zipped file succesfully removed!")
-
-            print("")
-            print("Fetching TexConv2... ")
-            print("")
-            response = requests.get('https://github.com/aboood40091/WiiUTools/tree/master/TexHaxU', verify=False)
-
+            response = requests.get('https://www.google.com', verify=False)
             if (int(response.status_code)) == 200:
-                print("Connected to the download page!")
+                print("")
+                print("It seems that the download page is down. Try restarting BFLIM Tool and check if it still doesn't work.")
+                print("")
+                print("Exiting in 5 seconds...")
+                time.sleep(5)
+                sys.exit(1)
 
             else:
-                response = requests.get('https://www.google.com', verify=False)
-                if (int(response.status_code)) == 200:
-                    print("")
-                    print("It seems that the download page is down. Try restarting BFLIM Tool and check if it still doesn't work.")
-                    print("")
-                    print("Exiting in 5 seconds...")
-                    time.sleep(5)
-                    sys.exit(1)
+                print("")
+                print("It looks like you don't have a working internet connection. Connect to another network, or solve the connection problem.")
+                print("")
+                print("Exiting in 5 seconds...")
+                time.sleep(5)
+                sys.exit(1)
 
-                else:
-                    print("")
-                    print("It looks like you don't have a working internet connection. Connect to another network, or solve the connection problem.")
-                    print("")
-                    print("Exiting in 5 seconds...")
-                    time.sleep(5)
-                    sys.exit(1)
+        source = "gtx_extract.exe"
+        destination = "C:/Tex"
 
-            print("")
-            print("Downloading...")
-            urllib.request.urlretrieve("https://github.com/aboood40091/WiiUTools/raw/master/TexHaxU/gfd.dll", "gfd.dll")
-            urllib.request.urlretrieve("https://github.com/aboood40091/WiiUTools/raw/master/TexHaxU/TexConv2.exe", "TexConv2.exe")
-            urllib.request.urlretrieve("https://github.com/aboood40091/WiiUTools/raw/master/TexHaxU/texUtils.dll", "texUtils.dll")
-            print("Download completed!")
+        if os.path.isfile(destination + '/' + source):
+            os.remove(destination + '/' + source)
 
-            print("")
-            print("Moving files...")
-            source1 = "gfd.dll"
-            source2 = "TexConv2.exe"
-            source3 = "texUtils.dll"
-            destination = "C:\Tex"
-            
-            if not os.path.isfile(destination + '/' + source1):
-                shutil.move(source1, destination)
-            else:
-                os.remove(destination + '/' + source1)
-                shutil.move(source1, destination)
+        print("")
+        print("Downloading...")
+        urllib.request.urlretrieve("https://github.com/aboood40091/RandomStuff/releases/download/v0.1/gtx_extract_no5.exe", "gtx_extract.exe")
+        print("Download completed!")
 
-            if not os.path.isfile(destination + '/' + source2):
-                shutil.move(source2, destination)
-            else:
-                os.remove(destination + '/' + source2)
-                shutil.move(source2, destination)
-
-            if not os.path.isfile(destination + '/' + source3):
-                shutil.move(source3, destination)
-            else:
-                os.remove(destination + '/' + source3)
-                shutil.move(source3, destination)
-
-            with open("C:\Tex\\new.txt", "wb") as txt:
-                txt.write(b'')
-                txt.close()
+        print("")
+        print("Moving files...")
         
-    top.title("BFLIM Tool v1.0")
+        if not os.path.isfile(destination + '/' + source):
+            shutil.move(source, destination)
+
+        print("")
+        print("Fetching TexConv2... ")
+        print("")
+        response = requests.get('https://github.com/aboood40091/WiiUTools/tree/master/TexHaxU', verify=False)
+
+        if (int(response.status_code)) == 200:
+            print("Connected to the download page!")
+
+        else:
+            response = requests.get('https://www.google.com', verify=False)
+            if (int(response.status_code)) == 200:
+                print("")
+                print("It seems that the download page is down. Try restarting BFLIM Tool and check if it still doesn't work.")
+                print("")
+                print("Exiting in 5 seconds...")
+                time.sleep(5)
+                sys.exit(1)
+
+            else:
+                print("")
+                print("It looks like you don't have a working internet connection. Connect to another network, or solve the connection problem.")
+                print("")
+                print("Exiting in 5 seconds...")
+                time.sleep(5)
+                sys.exit(1)
+
+        source1 = "gfd.dll"
+        source2 = "TexConv2.exe"
+        source3 = "texUtils.dll"
+        destination = "C:/Tex"
+
+        if os.path.isfile(destination + '/' + source1):
+            os.remove(destination + '/' + source1)
+
+        if os.path.isfile(destination + '/' + source2):
+            os.remove(destination + '/' + source2)
+
+        if os.path.isfile(destination + '/' + source3):
+            os.remove(destination + '/' + source3)
+
+        print("")
+        print("Downloading...")
+        urllib.request.urlretrieve("https://github.com/aboood40091/WiiUTools/raw/master/TexHaxU/gfd.dll", "gfd.dll")
+        urllib.request.urlretrieve("https://github.com/aboood40091/WiiUTools/raw/master/TexHaxU/TexConv2.exe", "TexConv2.exe")
+        urllib.request.urlretrieve("https://github.com/aboood40091/WiiUTools/raw/master/TexHaxU/texUtils.dll", "texUtils.dll")
+        print("Download completed!")
+
+        print("")
+        print("Moving files...")
+        
+        if not os.path.isfile(destination + '/' + source1):
+            shutil.move(source1, destination)
+
+        if not os.path.isfile(destination + '/' + source2):
+            shutil.move(source2, destination)
+
+        if not os.path.isfile(destination + '/' + source3):
+            shutil.move(source3, destination)
+
+        with open("C:/Tex/new.txt", "w+") as txt:
+            txt.write('v3.1')
+            txt.close()
+        
+    top.title("BFLIM Tool v1.1")
     filemenu.add_command(label="Open File", command=openfile)
     filemenu.add_command(label="Open Folder", command=openfolder)
     menubar.add_cascade(label="File", menu=filemenu)

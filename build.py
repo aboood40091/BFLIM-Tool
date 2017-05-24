@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # BFLIM Tool
-# Version 1.0
+# Version 1.1
 # Copyright © 2017 AboodXD
 
 # This file is part of BFLIM Tool.
@@ -25,7 +25,7 @@
 import os, shutil, sys
 from cx_Freeze import setup, Executable
 
-version = '1.0'
+version = '1.1'
 
 # Pick a build directory
 dir_ = 'bflim_tool v' + version
